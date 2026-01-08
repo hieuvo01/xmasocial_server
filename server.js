@@ -78,7 +78,9 @@ console.log("📂 Server đang phục vụ ảnh từ thư mục:", uploadDir);
 app.use('/uploads', express.static(uploadDir));
 // =========================================================================
 
-
+app.get('/', (req, res) => {
+  res.send('API Server is running successfully!');
+});
 // --- ROUTES ---
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
