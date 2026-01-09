@@ -4,7 +4,7 @@ import asyncHandler from 'express-async-handler';
 import Story from '../models/storyModel.js';
 import User from '../models/userModel.js';
 import Notification from '../models/notificationModel.js';
-import { cloudinary } from '../config/cloudinary.js'; // Đảm bảo import cloudinary
+import { cloudinary } from '../config/cloudinary.js'; 
 
 // @desc    Tạo story chữ (text-only)
 // @route   POST /api/stories/text
@@ -12,7 +12,7 @@ import { cloudinary } from '../config/cloudinary.js'; // Đảm bảo import clo
 export const createTextStory = asyncHandler(async (req, res) => {
   let { text, style, musicUrl, musicName } = req.body;
 
-  // Xử lý giá trị 'null' hoặc 'undefined' từ Flutter
+  // Xử lý giá trị 'null' hoặc 'undefined' (dưới dạng chuỗi từ Flutter) hoặc chuỗi rỗng thành null thật
   if (musicUrl === 'null' || musicUrl === 'undefined' || musicUrl === '') musicUrl = null;
   if (musicName === 'null' || musicName === 'undefined' || musicName === '') musicName = null;
 
@@ -26,8 +26,15 @@ export const createTextStory = asyncHandler(async (req, res) => {
     mediaType: 'text',
     text: text,
     style: style || 'gradient_blue',
-    music: musicUrl ? { url: musicUrl, name: musicName } : undefined,
   };
+
+  // 🔥 SỬA Ở ĐÂY: Thêm musicUrl và musicName trực tiếp vào newStoryData 🔥
+  if (musicUrl) { // Chỉ thêm nếu musicUrl có giá trị (không null)
+    newStoryData.musicUrl = musicUrl;
+  }
+  if (musicName) { // Chỉ thêm nếu musicName có giá trị (không null)
+    newStoryData.musicName = musicName;
+  }
 
   const story = await Story.create(newStoryData);
   const populatedStory = await Story.findById(story._id).populate('user', 'displayName avatarUrl');
@@ -41,10 +48,10 @@ export const createTextStory = asyncHandler(async (req, res) => {
 export const createMediaStoryDirect = asyncHandler(async (req, res) => {
   let { mediaType, mediaUrl, text, style, musicUrl, musicName } = req.body;
 
-  // Xử lý giá trị 'null' hoặc 'undefined' từ Flutter
+  // Xử lý giá trị 'null' hoặc 'undefined' (dưới dạng chuỗi từ Flutter) hoặc chuỗi rỗng thành null thật
   if (musicUrl === 'null' || musicUrl === 'undefined' || musicUrl === '') musicUrl = null;
   if (musicName === 'null' || musicName === 'undefined' || musicName === '') musicName = null;
-  if (text === 'null' || text === 'undefined' || text === '') text = null; // Caption có thể trống
+  if (text === 'null' || text === 'undefined' || text === '') text = null; // Caption (text) có thể trống
 
   if (!mediaUrl) {
     res.status(400);
@@ -56,9 +63,16 @@ export const createMediaStoryDirect = asyncHandler(async (req, res) => {
     mediaType: mediaType, // 'image' hoặc 'video'
     mediaUrl: mediaUrl,   // Link đã có từ Cloudinary
     text: text,           // Caption (nếu có)
-    style: style || 'gradient_blue', // Style cho ảnh/video (nếu cần)
-    music: musicUrl ? { url: musicUrl, name: musicName } : undefined,
+    style: style || 'gradient_blue', // Style mặc định cho media (nếu muốn)
   };
+
+  // 🔥 SỬA Ở ĐÂY: Thêm musicUrl và musicName trực tiếp vào newStoryData 🔥
+  if (musicUrl) { // Chỉ thêm nếu musicUrl có giá trị (không null)
+    newStoryData.musicUrl = musicUrl;
+  }
+  if (musicName) { // Chỉ thêm nếu musicName có giá trị (không null)
+    newStoryData.musicName = musicName;
+  }
 
   const story = await Story.create(newStoryData);
   const populatedStory = await Story.findById(story._id).populate('user', 'displayName avatarUrl');
@@ -90,8 +104,8 @@ export const getStoriesFeed = asyncHandler(async (req, res) => {
       createdAt: story.createdAt,
       text: story.text,
       style: story.style,
-      musicUrl: story.musicUrl,
-      musicName: story.musicName,
+      musicUrl: story.musicUrl, // Đảm bảo lấy musicUrl từ database
+      musicName: story.musicName, // Đảm bảo lấy musicName từ database
       reactions: story.reactions,
       viewerIds: story.viewers
     });
@@ -169,4 +183,3 @@ export const deleteStoryAdmin = asyncHandler(async (req, res) => {
     throw new Error('Story không tồn tại');
   }
 });
-
