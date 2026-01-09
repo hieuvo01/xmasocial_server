@@ -25,7 +25,7 @@ import {
   resetPassword,
   changePassword,
   updateUserProfile,
-  updateUserAvatar, // Đây là hàm nhận link Cloudinary   
+  updateAvatarDirect, // Đây là hàm nhận link Cloudinary   
 } from '../controllers/userController.js';
 
 import { protect, admin, moderator } from '../middleware/authMiddleware.js';
@@ -47,7 +47,7 @@ router.get('/profile', protect, getUserProfile);
 router.put('/profile', protect, updateUserProfile);
 
 // 🔥 SỬA Ở ĐÂY: Bỏ middleware 'upload.single' vì mình gửi JSON (link Cloudinary)
-router.put('/profile/avatar', protect, updateUserAvatar); 
+router.put('/profile/avatar', protect, updateAvatarDirect); 
 
 router.get('/suggestions', protect, getUserSuggestions);
 router.get('/search', protect, searchUsersAndPosts);

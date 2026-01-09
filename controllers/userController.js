@@ -681,36 +681,6 @@ const changePassword = async (req, res) => {
   }
 };
 
-// @desc    Cập nhật ảnh đại diện
-// @route   PUT /api/users/profile/avatar
-// @access  Private
-const updateUserAvatar = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-
-  if (user) {
-    if (req.file) {
-      // Lưu đường dẫn file vào user
-      user.avatarUrl = `/uploads/${req.file.filename}`;
-      const updatedUser = await user.save();
-      
-      res.json({
-        _id: updatedUser._id,
-        displayName: updatedUser.displayName,
-        email: updatedUser.email,
-        username: updatedUser.username,
-        avatarUrl: updatedUser.avatarUrl,
-        // ... trả về các trường cần thiết khác
-      });
-    } else {
-      res.status(400);
-      throw new Error('Chưa có file ảnh được tải lên');
-    }
-  } else {
-    res.status(404);
-    throw new Error('Người dùng không tồn tại');
-  }
-});
-
 // @desc    Cập nhật avatar bằng URL trực tiếp
 // @route   PUT /api/users/profile/avatar
 export const updateAvatarDirect = asyncHandler(async (req, res) => {
@@ -752,5 +722,4 @@ export {
     resetPassword,
     changePassword,
     updateUserProfile,
-    updateUserAvatar
 };
