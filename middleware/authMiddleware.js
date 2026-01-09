@@ -39,13 +39,18 @@ const admin = (req, res, next) => {
   }
 };
 
-// 👇 2. Middleware MODERATOR (Cho phép cả Admin và Moderator)
+// 👇 2. Middleware MODERATOR (Cập nhật để chấp nhận role 'manager')
 const moderator = (req, res, next) => {
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'moderator')) {
+  if (
+    req.user && 
+    (req.user.role === 'admin' || 
+     req.user.role === 'moderator' || 
+     req.user.role === 'manager') // 🔥 Thêm 'manager' vào đây
+  ) {
     next(); 
   } else {
     res.status(401); 
-    throw new Error('Yêu cầu quyền Kiểm duyệt viên'); 
+    throw new Error('Yêu cầu quyền Quản lý/Kiểm duyệt viên'); 
   }
 };
 

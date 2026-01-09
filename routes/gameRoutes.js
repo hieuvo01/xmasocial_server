@@ -57,43 +57,61 @@ router.delete('/clear-state/:gameId', protect, async (req, res) => {
   }
 });
 
+
 // --- 4. NỘP ĐIỂM (Leaderboard) ---
+// Logic mới: Chỉ cập nhật nếu điểm mới CAO HƠN điểm cũ
 router.post('/submit-score', protect, async (req, res) => {
   try {
     const { gameId, score } = req.body;
     const userId = req.user._id;
-    // Lấy tên user (ưu tiên name, nếu không có lấy username, hoặc email)
-    const username = req.user.name || req.user.username || "Gamer"; 
+    // Lấy tên hiển thị ưu tiên
+    const username = req.user.name || req.user.username || "Gamer";
 
-    // Logic: Có thể lưu đè nếu điểm cao hơn, hoặc lưu lịch sử
-    // Ở đây tui lưu lịch sử chơi mới luôn
-    const newScore = new Leaderboard({ 
-        userId, 
-        username, 
-        gameId, 
-        score 
-    });
-    await newScore.save();
-    
-    res.json({ success: true, message: "Score submitted" });
+    // 1. Tìm xem user này đã có điểm ở game này chưa
+    const existingEntry = await Leaderboard.findOne({ userId, gameId });
+
+    if (existingEntry) {
+      // 2. Nếu có rồi, kiểm tra xem điểm mới có cao hơn không
+      if (score > existingEntry.score) {
+        existingEntry.score = score;
+        existingEntry.username = username; // Cập nhật lại tên nhỡ user đổi tên
+        existingEntry.createdAt = Date.now(); // Cập nhật thời gian
+        await existingEntry.save();
+        return res.json({ success: true, message: "New high score updated!" });
+      } else {
+        return res.json({ success: true, message: "Score is lower than record, kept old score." });
+      }
+    } else {
+      // 3. Nếu chưa có thì tạo mới
+      const newScore = new Leaderboard({
+        userId,
+        username,
+        gameId,
+        score
+      });
+      await newScore.save();
+      return res.json({ success: true, message: "First score submitted!" });
+    }
+
   } catch (err) {
     console.error("Submit Score Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// --- 5. LẤY BẢNG XẾP HẠNG (Public - Không cần login cũng xem được) ---
+// --- 5. LẤY BẢNG XẾP HẠNG (Public) ---
 router.get('/leaderboard/:gameId', async (req, res) => {
-    try {
-      const topScores = await Leaderboard.find({ gameId: req.params.gameId })
-        .sort({ score: -1 }) // Điểm cao xếp trước
-        .limit(10) // Lấy top 10
-        .select('username score createdAt');
-  
-      res.json(topScores);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  try {
+    // Lấy Top 20 người điểm cao nhất
+    const topScores = await Leaderboard.find({ gameId: req.params.gameId })
+      .sort({ score: -1 }) // Giảm dần
+      .limit(20)
+      .select('username score createdAt'); // Chỉ lấy các trường cần thiết
+
+    res.json(topScores);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 export default router;

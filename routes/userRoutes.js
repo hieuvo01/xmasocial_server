@@ -91,7 +91,8 @@ router.post('/github', loginWithGithub);
 
 // 1. Thống kê Dashboard (Chỉ Admin)
 router.get('/admin/stats', protect, admin, getDashboardStats);
-
+//    Thống kê Dashboard (Quản lý)
+router.get('/admin/stats', protect, moderator, getDashboardStats);
 // 2. Chỉnh sửa User (Chỉ Admin mới được sửa thông tin User khác)
 router.put('/:id/admin-update', protect, admin, updateUserByAdmin);
 
