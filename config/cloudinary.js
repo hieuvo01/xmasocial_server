@@ -18,12 +18,15 @@ cloudinary.config({
 });
 
 // 2. Cấu hình bộ nhớ lưu trữ
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'xmasocial_uploads',
-    resource_type: 'auto',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'mp4', 'mov', 'mp3', 'flac', 'aac'],
+const storage = new CloudinaryStorage({ 
+  cloudinary: cloudinary, // Đảm bảo truyền biến cloudinary đã import từ 'cloudinary'
+  params: async (req, file) => {
+    // Sử dụng function params để linh hoạt hơn và tránh lỗi kén định dạng
+    return {
+      folder: 'xmasocial_uploads',
+      resource_type: 'auto', // Tự động nhận diện image/video/raw
+      allowed_formats: ['jpg', 'jpeg', 'png', 'mp4', 'mov', 'mp3', 'flac', 'aac'],
+    };
   },
 });
 
