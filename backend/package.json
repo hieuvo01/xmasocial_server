@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "xmasocial_server": "file:.."
+  }
+}
