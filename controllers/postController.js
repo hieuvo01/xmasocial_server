@@ -419,6 +419,29 @@ const deletePostAdmin = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Tạo bài đăng mới trực tiếp với URL từ Cloudinary
+// @route   POST /api/posts/create-direct
+const createPostDirect = asyncHandler(async (req, res) => {
+    const { content, mediaUrls } = req.body;
+
+    // Validate: Phải có nội dung hoặc có media
+    if ((!content || content.trim() === '') && (!mediaUrls || mediaUrls.length === 0)) {
+        res.status(400);
+        throw new Error('Nội dung hoặc hình ảnh/video không được để trống');
+    }
+
+    const post = new Post({
+        content: content || '',
+        author: req.user._id,
+        media: mediaUrls || [], // mediaUrls là mảng string gửi từ Flutter
+        imageUrl: (mediaUrls && mediaUrls.length > 0) ? mediaUrls[0] : ''
+    });
+
+    const createdPost = await post.save();
+    await createdPost.populate('author', 'displayName username avatarUrl');
+    res.status(201).json(createdPost);
+});
+
 export {
   getPosts,
   getPostsByUser,
@@ -432,5 +455,6 @@ export {
   deletePost,
   getAllPostsAdmin,
   updatePostAdmin,
-  deletePostAdmin
+  deletePostAdmin,
+  createPostDirect
 };

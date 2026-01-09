@@ -711,6 +711,26 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Cập nhật avatar bằng URL trực tiếp
+// @route   PUT /api/users/profile/avatar
+export const updateAvatarDirect = asyncHandler(async (req, res) => {
+    const { avatarUrl } = req.body;
+    if (!avatarUrl) {
+        res.status(400);
+        throw new Error('Không có URL ảnh đại diện');
+    }
+
+    const user = await User.findById(req.user._id);
+    if (user) {
+        user.avatarUrl = avatarUrl;
+        const updatedUser = await user.save();
+        res.json(updatedUser);
+    } else {
+        res.status(404);
+        throw new Error('Người dùng không tồn tại');
+    }
+});
+
 
 export { 
     authUser, 

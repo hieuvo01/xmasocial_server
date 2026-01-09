@@ -16,7 +16,8 @@ import {
     deletePost,
     getAllPostsAdmin,
     deletePostAdmin,
-    updatePostAdmin
+    updatePostAdmin,
+    createPostDirect
 } from '../controllers/postController.js';
 
 import * as commentController from '../controllers/commentController.js';
@@ -34,7 +35,7 @@ const storage = multer.diskStorage({
 
 function checkFileType(file, cb) {
   // 👇👇👇 CHO PHÉP CẢ VIDEO 👇👇👇
-  const filetypes = /jpg|jpeg|png|mp4|mov|avi|mkv/;
+  const filetypes = /jpg|jpeg|png|mp4|aac|flac|mov|avi|mkv/;
   // 👆👆👆
   const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = filetypes.test(file.mimetype);
@@ -71,6 +72,7 @@ router.route('/')
   .post(protect, upload.array('media', 10), createPost); 
 // 👆👆👆
 
+router.route('/create-direct').post(protect, createPostDirect);
 router.route('/:postId/react').post(protect, reactToPost);
 router.route('/:postId/reactions').get(protect, getPostReactions);
 
