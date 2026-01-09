@@ -134,72 +134,44 @@ router.get('/:id/messages', protect, async (req, res) => {
 
 
 
-// --- API: GỬI TIN NHẮN (ĐÃ UPDATE REPLY) ---
-router.post('/:id/messages', protect, upload.single('image'), async (req, res) => {
+// --- API: GỬI TIN NHẮN (ĐÃ TỐI ƯU CHO CLOUDINARY) ---
+router.post('/:id/messages', protect, async (req, res) => {
   try {
-    // 👇 Thêm replyTo vào đây để lấy ID tin nhắn gốc từ Client
+    // Flutter bây giờ gửi content là Link HTTPS từ Cloudinary
     let { content, type, replyTo } = req.body;
 
-    // --- LOGIC XỬ LÝ ẢNH (Giữ nguyên) ---
-    // --- LOGIC XỬ LÝ FILE (ĐÃ UPDATE TỰ NHẬN DIỆN TYPE) ---
-    if (req.file) {
-      // 1. Tạo đường dẫn file
-      content = `${process.env.BASE_URL || ''}/uploads/${req.file.filename}`;
-      
-      // 2. TỰ ĐỘNG PHÁT HIỆN TYPE DỰA VÀO MIMETYPE
-      const mimeType = req.file.mimetype; // Ví dụ: 'audio/aac', 'image/jpeg'
-      
-      if (mimeType.startsWith('image/')) {
-        type = 'image';
-      } 
-      // Check kỹ cho audio (aac, mp3, m4a, wav...)
-      else if (mimeType.startsWith('audio/') || 
-               req.file.filename.endsWith('.aac') || 
-               req.file.filename.endsWith('.m4a') || 
-               req.file.filename.endsWith('.mp3')) {
-        type = 'audio';
-      } 
-      else if (mimeType.startsWith('video/')) {
-        type = 'video';
-      } 
-      else {
-        type = 'file'; // Các loại file khác
-      }
-    }
-
-
     if (!content) {
-        return res.status(400).json({ message: "Content is required" });
+        return res.status(400).json({ message: "Nội dung tin nhắn không được để trống" });
     }
 
-    // 1. Lưu tin nhắn (Thêm replyTo vào DB)
+    // 1. Lưu tin nhắn vào Database
     const newMessage = new Message({
       conversation: req.params.id,
       sender: req.user._id,
-      content: content,
+      content: content, // Đây là link Cloudinary
       type: type || 'text',
-      replyTo: replyTo || null // <--- LƯU ID TIN NHẮN GỐC
+      replyTo: replyTo || null
     });
 
     let savedMessage = await newMessage.save();
 
-    // 2. Populate ĐẦY ĐỦ (Cả sender và replyTo)
-    // Client cần thông tin của tin nhắn gốc để hiển thị trích dẫn
+    // 2. Populate thông tin để Client hiển thị
     savedMessage = await savedMessage.populate([
       { path: 'sender', select: 'displayName avatarUrl' },
       { 
-        path: 'replyTo', // Populate tin nhắn gốc
+        path: 'replyTo', 
         select: 'content type sender', 
-        populate: { path: 'sender', select: 'displayName' } // Lấy tên người gửi gốc
+        populate: { path: 'sender', select: 'displayName' } 
       }
     ]);
 
-    // 3. Cập nhật Conversation (Giữ nguyên)
+    // 3. Cập nhật Conversation (Last Message & Unread Count)
     const conversation = await Conversation.findById(req.params.id);
     const updates = { lastMessage: savedMessage._id };
 
     if (conversation.participants) {
       conversation.participants.forEach(pId => {
+        // Tăng unreadCount cho người nhận
         if (pId.toString() !== req.user._id.toString()) {
             const currentCount = conversation.unreadCounts.get(pId.toString()) || 0;
             updates[`unreadCounts.${pId}`] = currentCount + 1;
@@ -208,7 +180,7 @@ router.post('/:id/messages', protect, upload.single('image'), async (req, res) =
     }
     await Conversation.findByIdAndUpdate(req.params.id, { $set: updates });
 
-    // 4. BẮN SOCKET (Giữ nguyên)
+    // 4. Bắn Socket thông báo tin nhắn mới
     const io = req.app.get('socketio');
     if (conversation.participants) {
         conversation.participants.forEach(participantId => {
@@ -225,6 +197,7 @@ router.post('/:id/messages', protect, upload.single('image'), async (req, res) =
     res.status(500).json(err);
   }
 });
+
 
 
 
@@ -270,39 +243,22 @@ router.put('/:id/theme', protect, async (req, res) => {
 router.delete('/:id/messages/:messageId', protect, async (req, res) => {
   try {
     const message = await Message.findById(req.params.messageId);
+    if (!message) return res.status(404).json({ message: "Tin nhắn không tồn tại" });
 
-    if (!message) {
-      return res.status(404).json({ message: "Tin nhắn không tồn tại" });
-    }
-
-    // Kiểm tra quyền: Chỉ người gửi mới được thu hồi
     if (message.sender.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Bạn không có quyền thu hồi tin nhắn này" });
+      return res.status(403).json({ message: "Không có quyền" });
     }
 
-    // 1. Nếu là ảnh -> Xóa file trên đĩa cứng để tiết kiệm dung lượng
-    // (Đây là nguyên nhân gây lỗi 404 nếu DB chưa cập nhật mà file đã mất)
-    if (message.type === 'image' && message.content.includes('/uploads/')) {
-       // Lấy tên file từ đường dẫn URL
-       const filename = message.content.split('/uploads/')[1];
-       const filePath = path.join('public/uploads', filename);
-       
-       // Xóa file nếu tồn tại
-       if (fs.existsSync(filePath)) {
-         fs.unlinkSync(filePath);
-       }
-    }
+    // 🔥 BỎ ĐOẠN XÓA FILE fs.unlinkSync Ở ĐÂY 🔥
+    // Vì file đã nằm trên Cloudinary, ta chỉ cần thu hồi nội dung hiển thị
 
-    // 2. Cập nhật Database (Soft Delete)
-    // Thay vì xóa hẳn dòng trong DB (deleteOne), ta chỉ đánh dấu isRecalled = true
     message.isRecalled = true;
-    message.content = "Tin nhắn đã được thu hồi"; // Update luôn content trong DB cho chắc
+    message.content = "Tin nhắn đã được thu hồi";
     message.type = "revoked";
     await message.save();
 
-    // 3. Bắn Socket báo cho mọi người biết
+    // Bắn Socket báo thu hồi (giữ nguyên logic cũ của bro)
     const io = req.app.get('socketio');
-// Lấy lại thông tin conversation để biết gửi cho ai
     const conversation = await Conversation.findById(req.params.id);
     if (conversation && conversation.participants) {
         conversation.participants.forEach(pId => {
@@ -311,11 +267,10 @@ router.delete('/:id/messages/:messageId', protect, async (req, res) => {
                 messageId: req.params.messageId 
             });
         });
-      }
+    }
 
     res.status(200).json({ message: "Thu hồi thành công" });
   } catch (err) {
-    console.error(err);
     res.status(500).json(err);
   }
 });
