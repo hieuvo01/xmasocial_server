@@ -20,6 +20,9 @@ const require = createRequire(import.meta.url);
 const { Server } = require('socket.io'); 
 // =================================
 
+// 🔥 Thêm import cloudinary
+import { v2 as cloudinary } from 'cloudinary';
+
 // Import routes
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -81,6 +84,34 @@ app.use('/uploads', express.static(uploadDir));
 app.get('/', (req, res) => {
   res.send('API Server is running successfully!');
 });
+
+// 🔥 BỔ SUNG: Endpoint để Flutter lấy chữ ký Cloudinary
+app.get('/api/config/cloudinary-signature', (req, res) => {
+  try {
+    const timestamp = Math.round((new Date()).getTime() / 1000);
+    const folder = 'xmasocial_direct'; // Folder mà Flutter sẽ upload vào
+
+    const params = {
+      timestamp: timestamp,
+      folder: folder,
+    };
+
+    const signature = cloudinary.utils.api_sign_request(params, process.env.CLOUDINARY_API_SECRET);
+
+    res.json({
+      apiKey: process.env.CLOUDINARY_API_KEY,
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+      timestamp: timestamp,
+      signature: signature,
+      folder: folder, 
+    });
+  } catch (error) {
+    console.error("Error generating Cloudinary signature:", error);
+    res.status(500).json({ message: "Không thể lấy chữ ký Cloudinary." });
+  }
+});
+
+
 // --- ROUTES ---
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
@@ -225,19 +256,12 @@ io.on("connection", (socket) => {
     console.log(`User ${socket.userId} đã vào phòng game: ${roomId}`);
   });
 
-  // D. Xử lý nước đi (Chung cho Caro, Chess và Snake Guest Input)
+  // D. Xử lý nước đi (Chung cho Caro / Cờ Vua / Snake Guest Input)
   socket.on('make_game_move', (data) => {
-    // data có thể là { roomId, moveData } (Caro/Chess)
-    // hoặc { roomId, dir } (Snake)
-
     const { roomId } = data;
-
-    // 🔥 LOGIC SNAKE: Nếu có 'dir', đây là input của game Snake
     if (data.dir !== undefined) {
-        // Gửi sự kiện riêng cho Snake để Client dễ nhận diện
         socket.to(roomId).emit('opponent_input', data);
     } else {
-        // Mặc định cho Caro/Chess (gửi opponent_move)
         const moveData = data.moveData || data; 
         socket.to(roomId).emit('opponent_move', moveData);
     }
@@ -246,13 +270,11 @@ io.on("connection", (socket) => {
   // 🔥 E. LOGIC RIÊNG CHO SNAKE ONLINE (Cập nhật Real-time)
   // Host gửi trạng thái game (vị trí rắn, táo) cho Guest
   socket.on('update_game_state', (data) => {
-      // data: { roomId, snake1, snake2, food, score1, score2, dir1, dir2 }
       socket.to(data.roomId).emit('game_state_update', data);
   });
 
   // Tín hiệu Game Over (đồng bộ cho cả 2)
   socket.on('game_over_signal', (data) => {
-      // data: { roomId, winner }
       io.in(data.roomId).emit('game_over', data);
   });
 

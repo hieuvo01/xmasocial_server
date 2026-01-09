@@ -4,53 +4,67 @@ import asyncHandler from 'express-async-handler';
 import Story from '../models/storyModel.js';
 import User from '../models/userModel.js';
 import Notification from '../models/notificationModel.js';
-import { cloudinary } from '../config/cloudinary.js';
+import { cloudinary } from '../config/cloudinary.js'; // Đảm bảo import cloudinary
 
-// @desc    Tạo story mới
-export const createStory = asyncHandler(async (req, res) => {
-  let { text, style, mediaType, musicUrl, musicName } = req.body;
+// @desc    Tạo story chữ (text-only)
+// @route   POST /api/stories/text
+// @access  Private
+export const createTextStory = asyncHandler(async (req, res) => {
+  let { text, style, musicUrl, musicName } = req.body;
 
+  // Xử lý giá trị 'null' hoặc 'undefined' từ Flutter
   if (musicUrl === 'null' || musicUrl === 'undefined' || musicUrl === '') musicUrl = null;
   if (musicName === 'null' || musicName === 'undefined' || musicName === '') musicName = null;
 
-  // Tải nhạc lên Cloudinary vĩnh viễn
-  if (musicUrl && musicUrl.startsWith('http')) {
-    try {
-      const uploadRes = await cloudinary.uploader.upload(musicUrl, {
-        resource_type: "video", 
-        folder: "xmasocial/music",
-      });
-      musicUrl = uploadRes.secure_url;
-    } catch (error) {
-      console.error("Lỗi lưu nhạc:", error);
-      musicUrl = null;
-    }
+  if (!text || text.trim() === '') {
+    res.status(400);
+    throw new Error('Nội dung Story không được để trống.');
   }
 
   const newStoryData = {
     user: req.user._id,
-    musicUrl,
-    musicName,
+    mediaType: 'text',
+    text: text,
+    style: style || 'gradient_blue',
+    music: musicUrl ? { url: musicUrl, name: musicName } : undefined,
   };
-
-  if (mediaType === 'text') {
-    newStoryData.text = text;
-    newStoryData.style = style || 'gradient_blue';
-    newStoryData.mediaType = 'text';
-  } else {
-    if (!req.file) {
-      res.status(400);
-      throw new Error('Chưa có file media nào được tải lên');
-    }
-    newStoryData.mediaUrl = req.file.path; 
-    newStoryData.mediaType = mediaType || (req.file.mimetype.startsWith('image') ? 'image' : 'video');
-    if (text && text !== 'null') newStoryData.text = text;
-  }
 
   const story = await Story.create(newStoryData);
   const populatedStory = await Story.findById(story._id).populate('user', 'displayName avatarUrl');
   res.status(201).json(populatedStory);
 });
+
+
+// @desc    Tạo story media (ảnh/video) - Sau khi đã upload thẳng lên Cloudinary
+// @route   POST /api/stories/create-direct
+// @access  Private
+export const createMediaStoryDirect = asyncHandler(async (req, res) => {
+  let { mediaType, mediaUrl, text, style, musicUrl, musicName } = req.body;
+
+  // Xử lý giá trị 'null' hoặc 'undefined' từ Flutter
+  if (musicUrl === 'null' || musicUrl === 'undefined' || musicUrl === '') musicUrl = null;
+  if (musicName === 'null' || musicName === 'undefined' || musicName === '') musicName = null;
+  if (text === 'null' || text === 'undefined' || text === '') text = null; // Caption có thể trống
+
+  if (!mediaUrl) {
+    res.status(400);
+    throw new Error('Chưa có URL media nào được cung cấp.');
+  }
+
+  const newStoryData = {
+    user: req.user._id,
+    mediaType: mediaType, // 'image' hoặc 'video'
+    mediaUrl: mediaUrl,   // Link đã có từ Cloudinary
+    text: text,           // Caption (nếu có)
+    style: style || 'gradient_blue', // Style cho ảnh/video (nếu cần)
+    music: musicUrl ? { url: musicUrl, name: musicName } : undefined,
+  };
+
+  const story = await Story.create(newStoryData);
+  const populatedStory = await Story.findById(story._id).populate('user', 'displayName avatarUrl');
+  res.status(201).json(populatedStory);
+});
+
 
 // @desc    Lấy story feed
 export const getStoriesFeed = asyncHandler(async (req, res) => {
@@ -136,7 +150,7 @@ export const getStoryById = asyncHandler(async (req, res) => {
   res.json(story);
 });
 
-// === CÁC HÀM CHO ADMIN (QUAN TRỌNG ĐỂ FIX LỖI IMPORT) ===
+// === CÁC HÀM CHO ADMIN ===
 
 // @desc    Admin lấy tất cả story
 export const getAllStoriesAdmin = asyncHandler(async (req, res) => {
@@ -144,7 +158,7 @@ export const getAllStoriesAdmin = asyncHandler(async (req, res) => {
   res.json(stories);
 });
 
-// @desc    Admin xóa story (FIX LỖI NÀY)
+// @desc    Admin xóa story
 export const deleteStoryAdmin = asyncHandler(async (req, res) => {
   const story = await Story.findById(req.params.id);
   if (story) {
@@ -155,3 +169,4 @@ export const deleteStoryAdmin = asyncHandler(async (req, res) => {
     throw new Error('Story không tồn tại');
   }
 });
+

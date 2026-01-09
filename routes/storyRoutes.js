@@ -2,7 +2,8 @@
 
 import express from 'express';
 import { 
-  createStory, 
+  createTextStory, // Import hàm tạo story chữ
+  createMediaStoryDirect, // Import hàm tạo story media trực tiếp
   getStoriesFeed, 
   reactToStory, 
   viewStory, 
@@ -14,8 +15,9 @@ import {
 } from '../controllers/storyController.js';
 import { protect, moderator } from '../middleware/authMiddleware.js'; 
 
-// 🔥 QUAN TRỌNG: Import uploadCloud từ config Cloudinary của mình
-import { uploadCloud } from '../config/cloudinary.js';
+// 🔥 QUAN TRỌNG: Không cần dùng uploadCloud ở đây nữa cho story media
+// vì đã upload trực tiếp từ Flutter lên Cloudinary
+// import { uploadCloud } from '../config/cloudinary.js'; 
 
 const router = express.Router();
 
@@ -24,12 +26,15 @@ const router = express.Router();
 // 1. Lấy bảng tin story
 router.get('/feed', protect, getStoriesFeed);
 
-// 2. Tạo story chữ (Không cần upload file)
-router.post('/text', protect, createStory); 
+// 2. Tạo story chữ (Flutter gọi endpoint này khi mediaType == 'text')
+router.post('/text', protect, createTextStory); 
 
-// 3. Tạo story ảnh/video (Dùng uploadCloud để đẩy thẳng lên mây vĩnh viễn)
-// 'media' là field name mà Flutter gửi lên trong FormData
-router.post('/media', protect, uploadCloud.single('media'), createStory); 
+// 🔥 BỔ SUNG: Tạo story ảnh/video sau khi đã upload lên Cloudinary (Flutter gọi endpoint này)
+router.post('/create-direct', protect, createMediaStoryDirect);
+
+// 3. (Không dùng nữa cho Flutter mới) - Route cũ để tạo story ảnh/video có multer
+// router.post('/media', protect, uploadCloud.single('media'), createStory); 
+// Có thể xóa hoặc comment lại dòng này vì Flutter không gọi nó nữa
 
 // 4. Các route Admin/Moderator
 router.get('/admin/all', protect, moderator, getAllStoriesAdmin);

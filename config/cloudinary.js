@@ -2,13 +2,9 @@
 
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
-import pkg from 'multer-storage-cloudinary';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-// FIX LỖI "is not a constructor" CHO ESM
-const CloudinaryStorage = pkg.CloudinaryStorage || pkg.default?.CloudinaryStorage || pkg;
 
 // 1. Cấu hình Cloudinary
 cloudinary.config({
@@ -17,21 +13,33 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 2. Cấu hình bộ nhớ lưu trữ
-const storage = new CloudinaryStorage({ 
-  cloudinary: cloudinary, // Đảm bảo truyền biến cloudinary đã import từ 'cloudinary'
-  params: async (req, file) => {
-    // Sử dụng function params để linh hoạt hơn và tránh lỗi kén định dạng
-    return {
-      folder: 'xmasocial_uploads',
-      resource_type: 'auto', // Tự động nhận diện image/video/raw
-      allowed_formats: ['jpg', 'jpeg', 'png', 'mp4', 'mov', 'mp3', 'flac', 'aac'],
-    };
-  },
-});
+// 2. Sử dụng Memory Storage (Không lưu file vào ổ đĩa server)
+// Việc này giúp Render không bị tốn dung lượng đĩa và xử lý stream nhanh hơn
+const storage = multer.memoryStorage();
 
 // 3. Khởi tạo Multer
-const uploadCloud = multer({ storage });
+const uploadCloud = multer({ 
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 } // Giới hạn 20MB cho video/ảnh
+});
 
-// 4. Export
-export { uploadCloud, cloudinary };
+// 4. Hàm Helper để Stream Upload (Dùng trong Controller)
+// Bro có thể import hàm này vào storyController.js
+const streamUpload = (fileBuffer, folder = 'xmasocial_uploads') => {
+  return new Promise((resolve, reject) => {
+    let stream = cloudinary.uploader.upload_stream(
+      { 
+        folder: folder,
+        resource_type: "auto" 
+      },
+      (error, result) => {
+        if (result) resolve(result);
+        else reject(error);
+      }
+    );
+    // Đẩy dữ liệu từ RAM vào đường ống của Cloudinary
+    stream.end(fileBuffer);
+  });
+};
+
+export { uploadCloud, cloudinary, streamUpload };
