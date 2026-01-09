@@ -6,24 +6,24 @@ import mongoose from 'mongoose';
 
 // @desc    Tạo Reel mới
 // @route   POST /api/reels
-const createReel = asyncHandler(async (req, res) => {
-  const { description } = req.body;
-  if (!req.file) {
-    res.status(400);
-    throw new Error('Vui lòng upload video');
-  }
-  const videoUrl = `/uploads/${req.file.filename}`;
+// const createReel = asyncHandler(async (req, res) => {
+//   const { description } = req.body;
+//   if (!req.file) {
+//     res.status(400);
+//     throw new Error('Vui lòng upload video');
+//   }
+//   const videoUrl = `/uploads/${req.file.filename}`;
 
-  const reel = await Reel.create({
-    user: req.user._id,
-    videoUrl: videoUrl,
-    description: description || '',
-    isExternal: false,
-  });
+//   const reel = await Reel.create({
+//     user: req.user._id,
+//     videoUrl: videoUrl,
+//     description: description || '',
+//     isExternal: false,
+//   });
 
-  const fullReel = await Reel.findById(reel._id).populate('user', 'displayName avatarUrl');
-  res.status(201).json(fullReel);
-});
+//   const fullReel = await Reel.findById(reel._id).populate('user', 'displayName avatarUrl');
+//   res.status(201).json(fullReel);
+// });
 
 // @desc    Lấy danh sách Reels (RANDOM NGẪU NHIÊN)
 // @route   GET /api/reels
@@ -154,12 +154,35 @@ const deleteReelAdmin = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Tạo Reel mới trực tiếp với URL Cloudinary
+// @route   POST /api/reels/create-direct
+const createReelDirect = asyncHandler(async (req, res) => {
+  const { description, videoUrl, thumbnailUrl } = req.body;
+
+  if (!videoUrl) {
+    res.status(400);
+    throw new Error('Thiếu URL video từ Cloudinary');
+  }
+
+  const reel = await Reel.create({
+    user: req.user._id,
+    videoUrl: videoUrl, // Link https://res.cloudinary... từ Flutter
+    thumbnailUrl: thumbnailUrl || '',
+    description: description || '',
+    isExternal: false,
+  });
+
+  const fullReel = await Reel.findById(reel._id).populate('user', 'displayName avatarUrl');
+  res.status(201).json(fullReel);
+});
+
+
 export { 
-  createReel, 
   getReelsFeed,
   likeReel,
   commentOnReel,
   getReelComments,
   getAllReelsAdmin,
-  deleteReelAdmin
+  deleteReelAdmin,
+  createReelDirect
 };
