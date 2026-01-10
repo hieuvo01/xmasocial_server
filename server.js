@@ -363,6 +363,11 @@ socket.on('call_invite', (data) => {
   // Bro dùng io.to(data.to) vì ở dòng 155 bro đã cho user join vào room chính ID của họ rồi
   io.to(data.to).emit('call_invite', data);
 });
+
+socket.on('call_ended', (data) => {
+  console.log(`🎬 Cuộc gọi kết thúc, báo cho: ${data.to}`);
+  io.to(data.to).emit('call_ended', data);
+});
 });
 // =========================================================
 
