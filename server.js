@@ -360,8 +360,25 @@ socket.on('call_invite', (data) => {
   console.log(`📞 Có cuộc gọi từ ${data.fromName} (${data.fromId}) tới ${data.to}`);
   
   // Gửi tín hiệu đến đúng người nhận
-  // Bro dùng io.to(data.to) vì ở dòng 155 bro đã cho user join vào room chính ID của họ rồi
+  // Dùng io.to(data.to) vì ở dòng 155 đã cho user join vào room chính ID của họ rồi
   io.to(data.to).emit('call_invite', data);
+});
+
+// B. Người nhận nhấn TRẢ LỜI
+socket.on('call_accepted', (data) => {
+  console.log(`✅ Call Accepted bởi: ${socket.userId}`);
+  io.to(data.to).emit('call_accepted', data);
+});
+
+socket.on('call_rejected', (data) => {
+  console.log(`❌ Call Rejected bởi: ${socket.userId}`);
+  io.to(data.to).emit('call_rejected', data);
+});
+
+// Người gọi nhấn HỦY (trong khi đang chờ)
+socket.on('call_cancelled', (data) => {
+  console.log(`⏹️ Call Cancelled bởi: ${socket.userId}`);
+  io.to(data.to).emit('call_cancelled', data);
 });
 
 socket.on('call_ended', (data) => {
