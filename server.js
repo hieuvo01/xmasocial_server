@@ -352,8 +352,21 @@ io.on("connection", (socket) => {
       }
     }
   });
+
+  // ==========================================
+// 5. LOGIC CUỘC GỌI VIDEO / VOICE (ZEGO)
+// ==========================================
+socket.on('call_invite', (data) => {
+  console.log(`📞 Có cuộc gọi từ ${data.fromName} (${data.fromId}) tới ${data.to}`);
+  
+  // Gửi tín hiệu đến đúng người nhận
+  // Bro dùng io.to(data.to) vì ở dòng 155 bro đã cho user join vào room chính ID của họ rồi
+  io.to(data.to).emit('call_invite', data);
+});
 });
 // =========================================================
+
+
 
 // Middleware lỗi
 app.use(notFound);

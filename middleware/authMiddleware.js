@@ -39,14 +39,14 @@ const admin = (req, res, next) => {
   }
 };
 
-// 👇 2. Middleware MODERATOR (Cho phép cả Admin và Moderator)
+// 🔥 MỚI: Middleware dành cho Manager/Điều hành viên (Moderator)
+// Cho phép cả Admin và Moderator đi qua
 const moderator = (req, res, next) => {
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'moderator')) {
-    next(); 
+  if (req.user && (req.user.role === 'moderator' || req.user.role === 'admin')) {
+    next();
   } else {
-    res.status(401); 
-    throw new Error('Yêu cầu quyền Kiểm duyệt viên'); 
+    res.status(401);
+    throw new Error('Không có quyền. Chỉ dành cho Quản lý (Moderator/Admin).');
   }
 };
-
 export { protect, admin, moderator };
