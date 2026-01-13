@@ -56,35 +56,44 @@ const authUser = asyncHandler(async (req, res) => {
 const registerUser = asyncHandler(async (req, res) => {
   let { displayName, username, email, password, phoneNumber, avatarUrl } = req.body;
 
-  // 1. TRIM dữ liệu (Cắt khoảng trắng thừa đầu đuôi)
+  // 1. TRIM dữ liệu
   displayName = displayName?.trim();
   username = username?.trim();
-  email = email?.trim().toLowerCase(); // Email luôn chữ thường
+  email = email?.trim().toLowerCase();
 
   // 2. CHECK RỖNG
   if (!displayName || !username || !email || !password) {
     res.status(400); throw new Error('Vui lòng điền đầy đủ thông tin bắt buộc');
   }
 
-  // 3. VALIDATE EMAIL (Dùng Regex chuẩn)
+  // 3. VALIDATE EMAIL
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     res.status(400); throw new Error('Email không hợp lệ');
   }
 
-  // 4. VALIDATE PASSWORD (Độ mạnh)
-  // Ít nhất 6 ký tự (Bro có thể tăng lên 8, yêu cầu chữ hoa/số nếu muốn)
+  // 4. VALIDATE PASSWORD
   if (password.length < 6) {
     res.status(400); throw new Error('Mật khẩu phải có ít nhất 6 ký tự');
   }
 
-  // 5. VALIDATE USERNAME (Không dấu, không ký tự đặc biệt)
-  const usernameRegex = /^[a-zA-Z0-9_]+$/; // Chỉ cho phép chữ, số và gạch dưới
+  // 5. VALIDATE USERNAME
+  const usernameRegex = /^[a-zA-Z0-9_]+$/;
   if (!usernameRegex.test(username)) {
     res.status(400); throw new Error('Username chỉ được chứa chữ cái, số và dấu gạch dưới');
   }
+
+  // 🔥 FIX LỖI Ở ĐÂY: Khai báo biến userExists bằng cách tìm trong DB
+  const userExists = await User.findOne({ 
+    $or: [ { email }, { username } ] 
+  });
+
   if (userExists) {
-    res.status(400); throw new Error('User đã tồn tại');
+    res.status(400); 
+    const message = userExists.email === email 
+      ? 'Email này đã được đăng ký' 
+      : 'Username này đã tồn tại';
+    throw new Error(message);
   }
 
   let finalAvatarUrl = '';
@@ -94,7 +103,11 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const user = await User.create({
-    displayName, username, email, password, phoneNumber,
+    displayName, 
+    username, 
+    email, 
+    password, 
+    phoneNumber,
     avatarUrl: finalAvatarUrl,
     lastActive: new Date()
   });
@@ -115,7 +128,6 @@ const registerUser = asyncHandler(async (req, res) => {
     res.status(400); throw new Error('Dữ liệu không hợp lệ');
   }
 });
-
 // =====================================================================
 // PHẦN 2: USER PROFILE & INTERACTION
 // =====================================================================
