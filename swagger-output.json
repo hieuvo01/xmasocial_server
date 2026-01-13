@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "XmasOcial API Docs",
-    "version": "1.0.0",
-    "description": "Tài liệu API tĩnh cho ứng dụng mạng xã hội XmasOcial"
+    "title": "XmasOcial API Docs - Ultimate Edition",
+    "version": "3.0.0",
+    "description": "Tài liệu API đầy đủ cho toàn bộ hệ thống XmasOcial"
   },
   "servers": [
     { "url": "http://localhost:3000", "description": "Local Development" },
@@ -11,119 +11,214 @@
   ],
   "components": {
     "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      }
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
     }
   },
   "paths": {
-    "/api/users/login": {
+    "/api/auth/register": {
       "post": {
-        "tags": ["Auth & Users"],
-        "summary": "Đăng nhập bằng Email/Password",
-        "responses": { "200": { "description": "Thành công" } }
+        "tags": ["1. Authentication"],
+        "summary": "Đăng ký tài khoản",
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "email": { "type": "string" }, "password": { "type": "string" }, "name": { "type": "string" } } } } }
+        },
+        "responses": { "201": { "description": "Created" } }
       }
     },
-    "/api/users/github": {
+    "/api/auth/login": {
       "post": {
-        "tags": ["Auth & Users"],
-        "summary": "Đăng nhập qua Github",
-        "responses": { "200": { "description": "Thành công" } }
-      }
-    },
-    "/api/users": {
-      "post": {
-        "tags": ["Auth & Users"],
-        "summary": "Đăng ký tài khoản mới",
-        "responses": { "201": { "description": "Tạo thành công" } }
-      },
-      "get": {
-        "tags": ["Admin & Moderator"],
-        "summary": "Lấy danh sách tất cả người dùng",
-        "security": [{ "bearerAuth": [] }],
+        "tags": ["1. Authentication"],
+        "summary": "Đăng nhập",
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "email": { "type": "string" }, "password": { "type": "string" } } } } }
+        },
         "responses": { "200": { "description": "OK" } }
       }
     },
     "/api/users/profile": {
       "get": {
-        "tags": ["Auth & Users"],
-        "summary": "Lấy thông tin cá nhân hiện tại",
+        "tags": ["2. Users & Profile"],
+        "summary": "Lấy Profile cá nhân",
         "security": [{ "bearerAuth": [] }],
         "responses": { "200": { "description": "OK" } }
       },
       "put": {
-        "tags": ["Auth & Users"],
+        "tags": ["2. Users & Profile"],
         "summary": "Cập nhật Profile",
         "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "Cập nhật thành công" } }
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "displayName": { "type": "string" }, "bio": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "OK" } }
       }
     },
     "/api/users/profile/avatar": {
       "put": {
-        "tags": ["Auth & Users"],
-        "summary": "Cập nhật Avatar (Link Cloudinary)",
+        "tags": ["2. Users & Profile"],
+        "summary": "Cập nhật Avatar (Direct Cloudinary Link)",
         "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "Cập nhật thành công" } }
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "avatarUrl": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/users/2fa/generate": {
+      "post": {
+        "tags": ["2. Users & Profile"],
+        "summary": "Tạo mã 2FA",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/users/admin/stats": {
+      "get": {
+        "tags": ["11. Admin & Moderator"],
+        "summary": "Thống kê Dashboard",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
       }
     },
     "/api/posts": {
       "get": {
-        "tags": ["Posts"],
+        "tags": ["3. Posts"],
         "summary": "Lấy danh sách bài viết Newsfeed",
         "security": [{ "bearerAuth": [] }],
         "responses": { "200": { "description": "OK" } }
       },
       "post": {
-        "tags": ["Posts"],
-        "summary": "Tạo bài viết mới (Multipart/Direct)",
+        "tags": ["3. Posts"],
+        "summary": "Tạo bài viết mới (Multipart/Array)",
         "security": [{ "bearerAuth": [] }],
-        "responses": { "201": { "description": "Đã tạo" } }
+        "responses": { "201": { "description": "Created" } }
       }
     },
-    "/api/posts/{postId}/comments": {
+    "/api/posts/create-direct": {
+      "post": {
+        "tags": ["3. Posts"],
+        "summary": "Tạo bài viết (Link Cloudinary)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "content": { "type": "string" }, "mediaUrls": { "type": "array", "items": { "type": "string" } } } } } }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/comments/{postId}/comments": {
       "get": {
-        "tags": ["Posts"],
-        "summary": "Lấy danh sách bình luận của bài viết",
+        "tags": ["4. Comments"],
+        "summary": "Lấy comment của bài viết",
         "parameters": [{ "name": "postId", "in": "path", "required": true, "schema": { "type": "string" } }],
         "responses": { "200": { "description": "OK" } }
       },
       "post": {
-        "tags": ["Posts"],
-        "summary": "Thêm bình luận mới",
+        "tags": ["4. Comments"],
+        "summary": "Thêm comment mới",
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "name": "postId", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "201": { "description": "Đã thêm" } }
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "text": { "type": "string" } } } } } },
+        "responses": { "201": { "description": "Created" } }
       }
     },
-    "/api/friends/requests": {
-      "get": {
-        "tags": ["Friends"],
-        "summary": "Xem danh sách lời mời kết bạn",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "OK" } }
-      },
+    "/api/friends/send-request/{userId}": {
       "post": {
-        "tags": ["Friends"],
+        "tags": ["5. Friends"],
         "summary": "Gửi lời mời kết bạn",
         "security": [{ "bearerAuth": [] }],
-        "responses": { "201": { "description": "Đã gửi" } }
+        "parameters": [{ "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "201": { "description": "Sent" } }
+      }
+    },
+    "/api/friends/unfriend/{friendId}": {
+      "post": {
+        "tags": ["5. Friends"],
+        "summary": "Hủy kết bạn",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "friendId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/conversations": {
+      "get": {
+        "tags": ["6. Messenger"],
+        "summary": "Lấy danh sách Inbox",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["6. Messenger"],
+        "summary": "Tạo/Lấy cuộc hội thoại",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "targetId": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/conversations/{id}/messages": {
+      "get": {
+        "tags": ["6. Messenger"],
+        "summary": "Lấy tin nhắn trong hội thoại",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["6. Messenger"],
+        "summary": "Gửi tin nhắn (Text/Cloudinary)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "content": { "type": "string" }, "type": { "type": "string" }, "replyTo": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/stories/feed": {
+      "get": {
+        "tags": ["7. Stories"],
+        "summary": "Lấy bảng tin Story",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/stories/create-direct": {
+      "post": {
+        "tags": ["7. Stories"],
+        "summary": "Tạo Story Media (Direct)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "mediaUrl": { "type": "string" }, "mediaType": { "type": "string" } } } } } },
+        "responses": { "201": { "description": "OK" } }
+      }
+    },
+    "/api/reels": {
+      "get": {
+        "tags": ["8. Reels"],
+        "summary": "Lấy Reels Feed",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
       }
     },
     "/api/ai/chat": {
       "post": {
-        "tags": ["AI Service"],
-        "summary": "Chat với AI Assistant",
+        "tags": ["9. AI Assistant"],
+        "summary": "Chat với AI",
         "security": [{ "bearerAuth": [] }],
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "message": { "type": "string" }, "character": { "type": "object" }, "history": { "type": "array", "items": { "type": "object" } } } } } } },
         "responses": { "200": { "description": "OK" } }
       }
     },
-    "/api/config/cloudinary-signature": {
+    "/api/games/submit-score": {
+      "post": {
+        "tags": ["10. Games Engine"],
+        "summary": "Nộp điểm cao",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "gameId": { "type": "string" }, "score": { "type": "number" } } } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/notifications": {
       "get": {
-        "tags": ["Utils"],
-        "summary": "Lấy chữ ký để Upload trực tiếp lên Cloudinary (Dành cho Flutter)",
-        "responses": { "200": { "description": "Trả về apiKey, signature, timestamp" } }
+        "tags": ["12. Notifications"],
+        "summary": "Lấy thông báo",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
       }
     }
   }

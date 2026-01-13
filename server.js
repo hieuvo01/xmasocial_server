@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import fs from 'fs'; 
 import User from './models/userModel.js'; 
-
+import cors from 'cors';
 // --- SỬA SWAGGER THÀNH DẠNG TĨNH ---
 import swaggerUi from 'swagger-ui-express';
 // --------------------
@@ -49,6 +49,22 @@ const io = new Server(server, {
 app.set('socketio', io);
 
 app.use(express.json());
+
+// 2. Cấu hình CORS chi tiết (Đặt trước các route)
+app.use(cors({
+  origin: function (origin, callback) {
+    // Cho phép tất cả các origin trong giai đoạn dev, 
+    // hoặc các request không có origin (như từ chính Swagger UI chạy cùng host)
+    if (!origin || origin.startsWith('http://localhost') || origin.includes('onrender.com')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 
 // =========================================================================
 // ===== CẤU HÌNH STATIC FILE & TẠO FOLDER TỰ ĐỘNG =====
@@ -138,7 +154,7 @@ app.use('/api/reels', reelRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/ai', aiRoutes); 
 app.use('/api/games', gameRoutes);
-app.get('/api', (req, res) => res.send('API Face-Noel đang chạy! 🎅'));
+app.get('/api', (req, res) => res.send('API XmasOcial is running...'));
 
 // =========================================================
 // ===== LOGIC SOCKET.IO CHO TIN NHẮN & GAME ONLINE =====
