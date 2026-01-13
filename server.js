@@ -8,12 +8,9 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import fs from 'fs'; 
 import User from './models/userModel.js'; 
-// --- IMPORT SWAGGER ---
-import swaggerJSDoc from 'swagger-jsdoc';
+
+// --- SỬA SWAGGER THÀNH DẠNG TĨNH ---
 import swaggerUi from 'swagger-ui-express';
-// --- IMPORT MODEL ---
-import Message from './models/Message.js'; 
-import Conversation from './models/Conversation.js';
 // --------------------
 
 // ===== FIX IMPORT SOCKET.IO =====
@@ -79,50 +76,24 @@ ensureDir(musicDir);
 
 console.log("📂 Server đang phục vụ ảnh từ thư mục:", uploadDir);
 
-// --- CẤU HÌNH SWAGGER DEFINITION ---
-const swaggerOptions = {
-  swaggerDefinition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'XmasOcial API Documents',
-      version: '1.0.0',
-      description: 'Tài liệu hướng dẫn sử dụng API cho dự án XmasOcial',
-      contact: {
-        name: 'Developer'
-      },
-      servers: [
-              {
-                url: 'http://localhost:5000',
-                description: 'Local Server',
-              },
-              {
-                url: 'https://xmasocial-server.onrender.com', 
-                description: 'Production Server (OnRender)',
-              }
-            ]
-    },
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
-      },
-    },
-  },
-  // ĐƯỜNG DẪN QUÉT FILE: Quét tất cả file trong thư mục routes
-  apis: ['./backend/routes/*.js'], 
-};
+// =========================================================================
+// --- CẤU HÌNH SWAGGER TĨNH (ĐỌC TỪ FILE JSON) ---
+// =========================================================================
+const swaggerPath = path.join(__dirname, 'swagger-output.json');
+let swaggerDocument = {};
 
-const swaggerDocs = swaggerJSDoc(swaggerOptions);
+if (fs.existsSync(swaggerPath)) {
+    swaggerDocument = JSON.parse(fs.readFileSync(swaggerPath, 'utf8'));
+} else {
+    // Bản dự phòng nếu chưa có file JSON
+    swaggerDocument = { openapi: "3.0.0", info: { title: "XmasOcial", version: "1.0.0" }, paths: {} };
+}
 
-// --- ROUTE HIỂN THỊ GIAO DIỆN SWAGGER ---
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+// =========================================================================
 
 // 4. Cấu hình Serve Static
 app.use('/uploads', express.static(uploadDir));
-// =========================================================================
 
 app.get('/', (req, res) => {
   res.send('API Server is running successfully!');
@@ -132,7 +103,7 @@ app.get('/', (req, res) => {
 app.get('/api/config/cloudinary-signature', (req, res) => {
   try {
     const timestamp = Math.round((new Date()).getTime() / 1000);
-    const folder = 'xmasocial_direct'; // Folder mà Flutter sẽ upload vào
+    const folder = 'xmasocial_direct'; 
 
     const params = {
       timestamp: timestamp,
@@ -212,10 +183,10 @@ io.on("connection", (socket) => {
       if (conversation && conversation.participants) {
         conversation.participants.forEach(pId => {
           if (pId.toString() !== userId.toString()) {
-             io.to(pId.toString()).emit('message_read', {
-               conversationId: conversationId,
-               readerId: userId
-             });
+              io.to(pId.toString()).emit('message_read', {
+                conversationId: conversationId,
+                readerId: userId
+              });
           }
         });
       }
@@ -224,15 +195,9 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ==========================================
-  // 3. LOGIC GAME ONLINE (CARO / CỜ VUA / SNAKE)
-  // ==========================================
-
-  // A. Gửi lời mời chơi game
+  // 3. LOGIC GAME ONLINE
   socket.on('send_game_invite', async ({ fromUser, toUser, gameType }) => {
     try {
-      console.log(`🎮 ${fromUser} mời ${toUser} chơi ${gameType}`);
-
       let conversation = await Conversation.findOne({
         participants: { $all: [fromUser, toUser] }
       });
@@ -260,46 +225,23 @@ io.on("connection", (socket) => {
 
       const populatedMessage = await newMessage.populate('sender', 'displayName avatarUrl');
 
-      io.to(toUser).emit('new_message', {
-        conversationId: conversation._id,
-        message: populatedMessage
-      });
-      
-      io.to(fromUser).emit('new_message', {
-        conversationId: conversation._id,
-        message: populatedMessage
-      });
+      io.to(toUser).emit('new_message', { conversationId: conversation._id, message: populatedMessage });
+      io.to(fromUser).emit('new_message', { conversationId: conversation._id, message: populatedMessage });
 
-    } catch (error) {
-      console.error("Lỗi gửi invite game:", error);
-    }
+    } catch (error) { console.error("Lỗi gửi invite game:", error); }
   });
 
-
-  // B. Chấp nhận lời mời -> Tạo phòng chơi
   socket.on('accept_game_invite', ({ fromUser, toUser, gameType, inviteMessageId }) => {
     const roomId = `room_${gameType}_${Date.now()}`;
-    console.log(`✅ Game bắt đầu! Room: ${roomId} giữa ${fromUser} và ${toUser}`);
-
-    const gameData = { 
-      roomId, 
-      gameType, 
-      hostId: fromUser, 
-      guestId: toUser,  
-      inviteMessageId   
-    };
-
+    const gameData = { roomId, gameType, hostId: fromUser, guestId: toUser, inviteMessageId };
     io.to(fromUser).emit('game_started', gameData);
     io.to(toUser).emit('game_started', gameData);
   });
 
-  // C. Join vào phòng Game cụ thể
   socket.on('join_game_room', (roomId) => {
     socket.join(roomId);
-    console.log(`User ${socket.userId} đã vào phòng game: ${roomId}`);
   });
 
-  // D. Xử lý nước đi (Chung cho Caro / Cờ Vua / Snake Guest Input)
   socket.on('make_game_move', (data) => {
     const { roomId } = data;
     if (data.dir !== undefined) {
@@ -310,128 +252,70 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 🔥 E. LOGIC RIÊNG CHO SNAKE ONLINE (Cập nhật Real-time)
-  // Host gửi trạng thái game (vị trí rắn, táo) cho Guest
   socket.on('update_game_state', (data) => {
       socket.to(data.roomId).emit('game_state_update', data);
   });
 
-  // Tín hiệu Game Over (đồng bộ cho cả 2)
   socket.on('game_over_signal', (data) => {
       io.in(data.roomId).emit('game_over', data);
   });
 
-
-  // F. Rời phòng / Kết thúc game
   socket.on('leave_game_room', (roomId) => {
     socket.leave(roomId);
     socket.to(roomId).emit('opponent_left'); 
   });
 
-  // G. Khi game kết thúc (thắng/thua/hòa) -> Cập nhật tin nhắn mời
   socket.on('game_finished', async ({ roomId, gameType, inviteMessageId }) => {
     try {
-      console.log(`🏁 Game ${roomId} đã kết thúc. Update tin nhắn mời: ${inviteMessageId}`);
-      
-      let gameName = 'Game';
-      if (gameType === 'caro') gameName = 'Caro';
-      if (gameType === 'chess') gameName = 'Cờ Vua';
-      if (gameType === 'snake') gameName = 'Rắn Săn Mồi';
+      let gameName = gameType === 'caro' ? 'Caro' : gameType === 'chess' ? 'Cờ Vua' : 'Rắn Săn Mồi';
 
       const updatedMsg = await Message.findByIdAndUpdate(
         inviteMessageId,
-        { 
-          type: 'text', 
-          content: `🎮 Ván ${gameName} đã kết thúc.` 
-        },
+        { type: 'text', content: `🎮 Ván ${gameName} đã kết thúc.` },
         { new: true }
       ).populate('sender', 'displayName avatarUrl');
 
       if (updatedMsg) {
         const conversationId = updatedMsg.conversation;
-        
-        io.to(roomId).emit('update_message', {
-            conversationId: conversationId,
-            message: updatedMsg
-        });
-        
+        io.to(roomId).emit('update_message', { conversationId, message: updatedMsg });
         const conversation = await Conversation.findById(conversationId);
         if(conversation) {
             conversation.participants.forEach(userId => {
-                io.to(userId.toString()).emit('message_updated', {
-                    conversationId: conversationId,
-                    message: updatedMsg
-                });
+                io.to(userId.toString()).emit('message_updated', { conversationId, message: updatedMsg });
             });
         }
       }
-
-    } catch (error) {
-      console.error("Lỗi update game finish:", error);
-    }
+    } catch (error) { console.error("Lỗi update game finish:", error); }
   });
 
-  // ==========================================
-
-  // 4. Xử lý Disconnect & CẬP NHẬT OFFLINE
+  // 4. Xử lý Disconnect
   socket.on("disconnect", async () => {
-    console.log("❌ User Disconnected:", socket.id);
-    
     if (socket.userId) {
       try {
         const now = new Date();
-        await User.findByIdAndUpdate(socket.userId, { 
-          isOnline: false,
-          lastActive: now 
-        });
-
-        socket.broadcast.emit("user_status", {
-          userId: socket.userId,
-          isOnline: false,
-          lastActive: now.toISOString()
-        });
-      } catch (err) {
-        console.error("Lỗi update offline:", err);
-      }
+        await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastActive: now });
+        socket.broadcast.emit("user_status", { userId: socket.userId, isOnline: false, lastActive: now.toISOString() });
+      } catch (err) { console.error("Lỗi update offline:", err); }
     }
   });
 
-  // ==========================================
-// 5. LOGIC CUỘC GỌI VIDEO / VOICE (ZEGO)
-// ==========================================
-socket.on('call_invite', (data) => {
-  console.log(`📞 Có cuộc gọi từ ${data.fromName} (${data.fromId}) tới ${data.to}`);
-  
-  // Gửi tín hiệu đến đúng người nhận
-  // Dùng io.to(data.to) vì ở dòng 155 đã cho user join vào room chính ID của họ rồi
-  io.to(data.to).emit('call_invite', data);
+  // 5. LOGIC CUỘC GỌI VIDEO / VOICE
+  socket.on('call_invite', (data) => {
+    io.to(data.to).emit('call_invite', data);
+  });
+  socket.on('call_accepted', (data) => {
+    io.to(data.to).emit('call_accepted', data);
+  });
+  socket.on('call_rejected', (data) => {
+    io.to(data.to).emit('call_rejected', data);
+  });
+  socket.on('call_cancelled', (data) => {
+    io.to(data.to).emit('call_cancelled', data);
+  });
+  socket.on('call_ended', (data) => {
+    io.to(data.to).emit('call_ended', data);
+  });
 });
-
-// B. Người nhận nhấn TRẢ LỜI
-socket.on('call_accepted', (data) => {
-  console.log(`✅ Call Accepted bởi: ${socket.userId}`);
-  io.to(data.to).emit('call_accepted', data);
-});
-
-socket.on('call_rejected', (data) => {
-  console.log(`❌ Call Rejected bởi: ${socket.userId}`);
-  io.to(data.to).emit('call_rejected', data);
-});
-
-// Người gọi nhấn HỦY (trong khi đang chờ)
-socket.on('call_cancelled', (data) => {
-  console.log(`⏹️ Call Cancelled bởi: ${socket.userId}`);
-  io.to(data.to).emit('call_cancelled', data);
-});
-
-socket.on('call_ended', (data) => {
-  console.log(`🎬 Cuộc gọi kết thúc, báo cho: ${data.to}`);
-  io.to(data.to).emit('call_ended', data);
-});
-});
-// =========================================================
-
-
 
 // Middleware lỗi
 app.use(notFound);

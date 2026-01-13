@@ -2,8 +2,8 @@
 
 import express from 'express';
 import { 
-  createTextStory, 
-  createMediaStoryDirect, 
+  createTextStory, // Import hàm tạo story chữ
+  createMediaStoryDirect, // Import hàm tạo story media trực tiếp
   getStoriesFeed, 
   reactToStory, 
   viewStory, 
@@ -15,193 +15,39 @@ import {
 } from '../controllers/storyController.js';
 import { protect, moderator } from '../middleware/authMiddleware.js'; 
 
+// 🔥 QUAN TRỌNG: Không cần dùng uploadCloud ở đây nữa cho story media
+// vì đã upload trực tiếp từ Flutter lên Cloudinary
+// import { uploadCloud } from '../config/cloudinary.js'; 
+
 const router = express.Router();
 
-/**
- * @openapi
- * tags:
- * - name: Stories
- * description: Hệ thống tin ngắn (biến mất sau 24h)
- */
+// === CẤU TRÚC ROUTE ĐÃ TỐI ƯU ===
 
-// ==========================================
-// 🔵 USER ROUTES (FEED & CREATE)
-// ==========================================
-
-/**
- * @openapi
- * /api/stories/feed:
- * get:
- * summary: Lấy danh sách story của bạn bè và bản thân
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * responses:
- * 200:
- * description: Trả về bảng tin stories
- */
+// 1. Lấy bảng tin story
 router.get('/feed', protect, getStoriesFeed);
 
-/**
- * @openapi
- * /api/stories/text:
- * post:
- * summary: Tạo story dạng chữ (Text Story)
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * requestBody:
- * required: true
- * content:
- * application/json:
- * schema:
- * type: object
- * properties:
- * content: {type: string}
- * background: {type: string}
- * responses:
- * 201:
- * description: Đã tạo story thành công
- */
+// 2. Tạo story chữ (Flutter gọi endpoint này khi mediaType == 'text')
 router.post('/text', protect, createTextStory); 
 
-/**
- * @openapi
- * /api/stories/create-direct:
- * post:
- * summary: Tạo story Media (Dùng link Cloudinary trực tiếp từ Flutter)
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * requestBody:
- * required: true
- * content:
- * application/json:
- * schema:
- * type: object
- * properties:
- * mediaUrl: {type: string}
- * mediaType: {type: string, example: "image/video"}
- * responses:
- * 201:
- * description: Đã tạo story thành công
- */
+// 🔥 BỔ SUNG: Tạo story ảnh/video sau khi đã upload lên Cloudinary (Flutter gọi endpoint này)
 router.post('/create-direct', protect, createMediaStoryDirect);
 
-// ==========================================
-// 🟡 INTERACTIONS & DETAILS
-// ==========================================
+// 3. (Không dùng nữa cho Flutter mới) - Route cũ để tạo story ảnh/video có multer
+// router.post('/media', protect, uploadCloud.single('media'), createStory); 
+// Có thể xóa hoặc comment lại dòng này vì Flutter không gọi nó nữa
 
-/**
- * @openapi
- * /api/stories/{id}/react:
- * post:
- * summary: Thả cảm xúc vào story
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * parameters:
- * - in: path
- * name: id
- * required: true
- * responses:
- * 200:
- * description: OK
- */
+// 4. Các route Admin/Moderator
+router.get('/admin/all', protect, moderator, getAllStoriesAdmin);
+router.delete('/admin/:id', protect, moderator, deleteStoryAdmin);
+
+// 5. Tương tác với Story (React & View)
 router.post('/:id/react', protect, reactToStory);
-
-/**
- * @openapi
- * /api/stories/{id}/view:
- * post:
- * summary: Đánh dấu đã xem story
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * parameters:
- * - in: path
- * name: id
- * required: true
- * responses:
- * 200:
- * description: OK
- */
 router.post('/:id/view', protect, viewStory);
-
-/**
- * @openapi
- * /api/stories/{id}/viewers:
- * get:
- * summary: Xem danh sách những người đã xem story này
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * parameters:
- * - in: path
- * name: id
- * required: true
- * responses:
- * 200:
- * description: Danh sách người xem
- */
 router.get('/:id/viewers', protect, getStoryViewers);
 
-/**
- * @openapi
- * /api/stories/{id}:
- * get:
- * summary: Lấy chi tiết một story
- * tags: [Stories]
- * delete:
- * summary: Xóa story cá nhân
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * parameters:
- * - in: path
- * name: id
- * required: true
- * responses:
- * 200:
- * description: Xóa thành công
- */
-router.get('/:id', protect, getStoryById);
-router.delete('/:id', protect, deleteStory);
-
-// ==========================================
-// 🔴 ADMIN ROUTES
-// ==========================================
-
-/**
- * @openapi
- * /api/stories/admin/all:
- * get:
- * summary: Admin lấy toàn bộ story hệ thống
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * responses:
- * 200:
- * description: OK
- */
-router.get('/admin/all', protect, moderator, getAllStoriesAdmin);
-
-/**
- * @openapi
- * /api/stories/admin/{id}:
- * delete:
- * summary: Admin xóa một story bất kỳ
- * tags: [Stories]
- * security:
- * - bearerAuth: []
- * parameters:
- * - in: path
- * name: id
- * required: true
- * responses:
- * 200:
- * description: OK
- */
-router.delete('/admin/:id', protect, moderator, deleteStoryAdmin);
+// 6. Lấy chi tiết hoặc Xóa story cá nhân
+router.route('/:id')
+    .get(protect, getStoryById) 
+    .delete(protect, deleteStory); 
 
 export default router;

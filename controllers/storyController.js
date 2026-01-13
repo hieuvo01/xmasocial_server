@@ -12,7 +12,6 @@ import { cloudinary } from '../config/cloudinary.js';
 export const createTextStory = asyncHandler(async (req, res) => {
   let { text, style, musicUrl, musicName } = req.body;
 
-  // Xử lý giá trị 'null' hoặc 'undefined' (dưới dạng chuỗi từ Flutter) hoặc chuỗi rỗng thành null thật
   if (musicUrl === 'null' || musicUrl === 'undefined' || musicUrl === '') musicUrl = null;
   if (musicName === 'null' || musicName === 'undefined' || musicName === '') musicName = null;
 
@@ -28,13 +27,8 @@ export const createTextStory = asyncHandler(async (req, res) => {
     style: style || 'gradient_blue',
   };
 
-  // 🔥 SỬA Ở ĐÂY: Thêm musicUrl và musicName trực tiếp vào newStoryData 🔥
-  if (musicUrl) { // Chỉ thêm nếu musicUrl có giá trị (không null)
-    newStoryData.musicUrl = musicUrl;
-  }
-  if (musicName) { // Chỉ thêm nếu musicName có giá trị (không null)
-    newStoryData.musicName = musicName;
-  }
+  if (musicUrl) newStoryData.musicUrl = musicUrl;
+  if (musicName) newStoryData.musicName = musicName;
 
   const story = await Story.create(newStoryData);
   const populatedStory = await Story.findById(story._id).populate('user', 'displayName avatarUrl');
@@ -48,10 +42,9 @@ export const createTextStory = asyncHandler(async (req, res) => {
 export const createMediaStoryDirect = asyncHandler(async (req, res) => {
   let { mediaType, mediaUrl, text, style, musicUrl, musicName } = req.body;
 
-  // Xử lý giá trị 'null' hoặc 'undefined' (dưới dạng chuỗi từ Flutter) hoặc chuỗi rỗng thành null thật
   if (musicUrl === 'null' || musicUrl === 'undefined' || musicUrl === '') musicUrl = null;
   if (musicName === 'null' || musicName === 'undefined' || musicName === '') musicName = null;
-  if (text === 'null' || text === 'undefined' || text === '') text = null; // Caption (text) có thể trống
+  if (text === 'null' || text === 'undefined' || text === '') text = null;
 
   if (!mediaUrl) {
     res.status(400);
@@ -60,19 +53,14 @@ export const createMediaStoryDirect = asyncHandler(async (req, res) => {
 
   const newStoryData = {
     user: req.user._id,
-    mediaType: mediaType, // 'image' hoặc 'video'
-    mediaUrl: mediaUrl,   // Link đã có từ Cloudinary
-    text: text,           // Caption (nếu có)
-    style: style || 'gradient_blue', // Style mặc định cho media (nếu muốn)
+    mediaType: mediaType,
+    mediaUrl: mediaUrl,
+    text: text,
+    style: style || 'gradient_blue',
   };
 
-  // 🔥 SỬA Ở ĐÂY: Thêm musicUrl và musicName trực tiếp vào newStoryData 🔥
-  if (musicUrl) { // Chỉ thêm nếu musicUrl có giá trị (không null)
-    newStoryData.musicUrl = musicUrl;
-  }
-  if (musicName) { // Chỉ thêm nếu musicName có giá trị (không null)
-    newStoryData.musicName = musicName;
-  }
+  if (musicUrl) newStoryData.musicUrl = musicUrl;
+  if (musicName) newStoryData.musicName = musicName;
 
   const story = await Story.create(newStoryData);
   const populatedStory = await Story.findById(story._id).populate('user', 'displayName avatarUrl');
@@ -104,8 +92,8 @@ export const getStoriesFeed = asyncHandler(async (req, res) => {
       createdAt: story.createdAt,
       text: story.text,
       style: story.style,
-      musicUrl: story.musicUrl, // Đảm bảo lấy musicUrl từ database
-      musicName: story.musicName, // Đảm bảo lấy musicName từ database
+      musicUrl: story.musicUrl,
+      musicName: story.musicName,
       reactions: story.reactions,
       viewerIds: story.viewers
     });
@@ -115,18 +103,66 @@ export const getStoriesFeed = asyncHandler(async (req, res) => {
   res.json(Object.values(groupedStories));
 });
 
-// @desc    Bày tỏ cảm xúc
+// @desc    Bày tỏ cảm xúc về Story
+// @route   POST /api/stories/:id/react
+// @access  Private
 export const reactToStory = asyncHandler(async (req, res) => {
-    const { type } = req.body;
-    const story = await Story.findById(req.params.id);
-    if (!story) throw new Error('Story không tồn tại');
+    const { type } = req.body; // type: like, love, haha, vv..
+    const userId = req.user._id;
 
-    const index = story.reactions.findIndex(r => r.user.toString() === req.user._id.toString());
-    if (index > -1) story.reactions[index].type = type;
-    else story.reactions.push({ user: req.user._id, type });
+    const story = await Story.findById(req.params.id);
+    if (!story) {
+        res.status(404);
+        throw new Error('Story không tồn tại');
+    }
+
+    const index = story.reactions.findIndex(r => r.user.toString() === userId.toString());
+    
+    if (index > -1) {
+        // Nếu đã react rồi thì cập nhật lại loại icon
+        story.reactions[index].type = type;
+    } else {
+        // Nếu chưa react thì thêm mới
+        story.reactions.push({ user: userId, type });
+    }
 
     await story.save();
-    res.json({ message: 'React thành công' });
+
+    // 🔥 LOGIC TẠO THÔNG BÁO CHO STORY 🔥
+    // Chỉ tạo thông báo nếu người react không phải là chủ nhân story
+    if (story.user.toString() !== userId.toString()) {
+        // Kiểm tra xem đã có thông báo tương tự chưa để tránh spam
+        const existingNoti = await Notification.findOne({
+            recipient: story.user,
+            sender: userId,
+            relatedStory: story._id,
+            type: 'like'
+        });
+
+        if (!existingNoti) {
+            await Notification.create({
+                recipient: story.user,
+                sender: userId,
+                type: 'like',
+                // 👇 ĐÃ SỬA: Nội dung chuyên biệt cho Story 👇
+                content: 'đã bày tỏ cảm xúc về tin của bạn.',
+                relatedStory: story._id,
+                isRead: false
+            });
+
+            // Bắn Socket.io Realtime (nếu có cấu hình trong server.js)
+            const io = req.app.get('socketio');
+            if (io) {
+                io.to(story.user.toString()).emit('new_notification', {
+                    from: req.user.displayName,
+                    type: 'like',
+                    message: 'đã bày tỏ cảm xúc về tin của bạn.'
+                });
+            }
+        }
+    }
+
+    res.json({ message: 'React thành công', reactions: story.reactions });
 });
 
 // @desc    Ghi nhận lượt xem

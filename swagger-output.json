@@ -1,0 +1,130 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "XmasOcial API Docs",
+    "version": "1.0.0",
+    "description": "Tài liệu API tĩnh cho ứng dụng mạng xã hội XmasOcial"
+  },
+  "servers": [
+    { "url": "http://localhost:3000", "description": "Local Development" },
+    { "url": "https://xmasocial-server.onrender.com", "description": "Production Server" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/users/login": {
+      "post": {
+        "tags": ["Auth & Users"],
+        "summary": "Đăng nhập bằng Email/Password",
+        "responses": { "200": { "description": "Thành công" } }
+      }
+    },
+    "/api/users/github": {
+      "post": {
+        "tags": ["Auth & Users"],
+        "summary": "Đăng nhập qua Github",
+        "responses": { "200": { "description": "Thành công" } }
+      }
+    },
+    "/api/users": {
+      "post": {
+        "tags": ["Auth & Users"],
+        "summary": "Đăng ký tài khoản mới",
+        "responses": { "201": { "description": "Tạo thành công" } }
+      },
+      "get": {
+        "tags": ["Admin & Moderator"],
+        "summary": "Lấy danh sách tất cả người dùng",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/users/profile": {
+      "get": {
+        "tags": ["Auth & Users"],
+        "summary": "Lấy thông tin cá nhân hiện tại",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "put": {
+        "tags": ["Auth & Users"],
+        "summary": "Cập nhật Profile",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Cập nhật thành công" } }
+      }
+    },
+    "/api/users/profile/avatar": {
+      "put": {
+        "tags": ["Auth & Users"],
+        "summary": "Cập nhật Avatar (Link Cloudinary)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Cập nhật thành công" } }
+      }
+    },
+    "/api/posts": {
+      "get": {
+        "tags": ["Posts"],
+        "summary": "Lấy danh sách bài viết Newsfeed",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Posts"],
+        "summary": "Tạo bài viết mới (Multipart/Direct)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Đã tạo" } }
+      }
+    },
+    "/api/posts/{postId}/comments": {
+      "get": {
+        "tags": ["Posts"],
+        "summary": "Lấy danh sách bình luận của bài viết",
+        "parameters": [{ "name": "postId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Posts"],
+        "summary": "Thêm bình luận mới",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "postId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "201": { "description": "Đã thêm" } }
+      }
+    },
+    "/api/friends/requests": {
+      "get": {
+        "tags": ["Friends"],
+        "summary": "Xem danh sách lời mời kết bạn",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Friends"],
+        "summary": "Gửi lời mời kết bạn",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Đã gửi" } }
+      }
+    },
+    "/api/ai/chat": {
+      "post": {
+        "tags": ["AI Service"],
+        "summary": "Chat với AI Assistant",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/config/cloudinary-signature": {
+      "get": {
+        "tags": ["Utils"],
+        "summary": "Lấy chữ ký để Upload trực tiếp lên Cloudinary (Dành cho Flutter)",
+        "responses": { "200": { "description": "Trả về apiKey, signature, timestamp" } }
+      }
+    }
+  }
+}
