@@ -154,7 +154,41 @@ app.use('/api/reels', reelRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/ai', aiRoutes); 
 app.use('/api/games', gameRoutes);
-app.get('/api', (req, res) => res.send('API XmasOcial is running...'));
+app.get('/api', (req, res) => {
+  const routes = [];
+  
+  // Hàm đệ quy để lấy routes từ các router con
+  function print(stack, prefix = '') {
+    stack.forEach((layer) => {
+      if (layer.route) {
+        // Đây là một route trực tiếp
+        const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
+        routes.push({
+          method: methods,
+          path: prefix + layer.route.path
+        });
+      } else if (layer.name === 'router' && layer.handle.stack) {
+        // Đây là một router con (ví dụ: app.use('/api/users', userRoutes))
+        let newPrefix = prefix;
+        // Tìm prefix từ regexp của layer
+        if (layer.regexp) {
+          const match = layer.regexp.toString().match(/^\/\^\\(\/\w+)/);
+          if (match) newPrefix += match[1];
+        }
+        print(layer.handle.stack, newPrefix);
+      }
+    });
+  }
+
+  print(app._router.stack);
+
+  res.json({
+    message: "🚀 XmasOcial API is running!",
+    total_routes: routes.length,
+    endpoints: routes,
+    documentation: "https://xmasocial-server.onrender.com/api-docs" // Link đến Swagger của bro
+  });
+});
 
 // =========================================================
 // ===== LOGIC SOCKET.IO CHO TIN NHẮN & GAME ONLINE =====
