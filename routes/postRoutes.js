@@ -17,7 +17,8 @@ import {
     getAllPostsAdmin,
     deletePostAdmin,
     updatePostAdmin,
-    createPostDirect
+    createPostDirect,
+    updatePost
 } from '../controllers/postController.js';
 
 import * as commentController from '../controllers/commentController.js';
@@ -85,6 +86,7 @@ router.route('/:postId/comments/:commentId')
 
 router.route('/:id') 
   .get(protect, getPostById)
+  .put(protect, updatePost)
   .delete(protect, deletePost); 
   
 export default router;

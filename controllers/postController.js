@@ -109,6 +109,36 @@ const createPost = asyncHandler(async (req, res) => {
     res.status(201).json(createdPost);
 });
 
+// @desc    Cập nhật bài viết của chính mình
+// @route   PUT /api/posts/:id
+// @access  Private
+const updatePost = asyncHandler(async (req, res) => {
+  const { content } = req.body;
+  const post = await Post.findById(req.params.id);
+
+  if (!post) {
+    res.status(404);
+    throw new Error('Không tìm thấy bài viết');
+  }
+
+  // 🔥 KIỂM TRA QUYỀN: Chỉ chủ nhân bài viết mới được sửa
+  if (post.author.toString() !== req.user._id.toString()) {
+    res.status(401);
+    throw new Error('Bạn không có quyền chỉnh sửa bài viết của người khác');
+  }
+
+  // Cập nhật nội dung
+  post.content = content || post.content;
+  
+  // Lưu vào DB
+  const updatedPost = await post.save();
+  
+  // Populate lại thông tin tác giả để trả về Flutter hiển thị luôn
+  await updatedPost.populate('author', 'displayName username avatarUrl');
+
+  res.json(updatedPost);
+});
+
 // @desc    Thả reaction cho bài viết
 // @route   POST /api/posts/:postId/react
 const reactToPost = asyncHandler(async (req, res) => {
@@ -446,6 +476,7 @@ export {
   getPosts,
   getPostsByUser,
   createPost,
+  updatePost,
   reactToPost,
   createComment,
   getCommentsForPost,
