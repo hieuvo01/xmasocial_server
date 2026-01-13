@@ -1,18 +1,52 @@
 // File: backend/routes/gameRoutes.js
 
 import express from 'express';
-import GameSave from '../models/GameSave.js'; // Nhớ thêm .js nếu dùng ES Modules
+import GameSave from '../models/GameSave.js'; 
 import Leaderboard from '../models/Leaderboard.js';
-// Import middleware xác thực của bro (check tên file cho đúng với project của bro)
 import { protect } from '../middleware/authMiddleware.js'; 
 
 const router = express.Router();
 
+/**
+ * @openapi
+ * tags:
+ * - name: Games
+ * description: Quản lý lưu trữ game và bảng xếp hạng (Leaderboard)
+ */
+
 // --- 1. LƯU GAME (Save/Upsert) ---
+/**
+ * @openapi
+ * /api/games/save-state:
+ * post:
+ * summary: Lưu trạng thái trò chơi (Save Game)
+ * tags: [Games]
+ * security:
+ * - bearerAuth: []
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * required:
+ * - gameId
+ * - stateData
+ * properties:
+ * gameId:
+ * type: string
+ * example: "flappy_bird_01"
+ * stateData:
+ * type: object
+ * description: Mọi dữ liệu JSON về trạng thái game
+ * responses:
+ * 200:
+ * description: Đã lưu thành công
+ */
 router.post('/save-state', protect, async (req, res) => {
   try {
     const { gameId, stateData } = req.body;
-    const userId = req.user._id; // Lấy _id từ middleware protect
+    const userId = req.user._id;
 
     await GameSave.findOneAndUpdate(
       { userId, gameId },
@@ -27,6 +61,24 @@ router.post('/save-state', protect, async (req, res) => {
 });
 
 // --- 2. LOAD GAME ---
+/**
+ * @openapi
+ * /api/games/load-state/{gameId}:
+ * get:
+ * summary: Tải trạng thái đã lưu của một game
+ * tags: [Games]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: gameId
+ * required: true
+ * schema:
+ * type: string
+ * responses:
+ * 200:
+ * description: Trả về stateData đã lưu
+ */
 router.get('/load-state/:gameId', protect, async (req, res) => {
   try {
     const save = await GameSave.findOne({ 
@@ -44,6 +96,24 @@ router.get('/load-state/:gameId', protect, async (req, res) => {
 });
 
 // --- 3. XÓA SAVE (Clear) ---
+/**
+ * @openapi
+ * /api/games/clear-state/{gameId}:
+ * delete:
+ * summary: Xóa dữ liệu save của một game
+ * tags: [Games]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: gameId
+ * required: true
+ * schema:
+ * type: string
+ * responses:
+ * 200:
+ * description: Đã xóa thành công
+ */
 router.delete('/clear-state/:gameId', protect, async (req, res) => {
   try {
     await GameSave.findOneAndDelete({ 
@@ -57,32 +127,52 @@ router.delete('/clear-state/:gameId', protect, async (req, res) => {
   }
 });
 
-
 // --- 4. NỘP ĐIỂM (Leaderboard) ---
-// Logic mới: Chỉ cập nhật nếu điểm mới CAO HƠN điểm cũ
+/**
+ * @openapi
+ * /api/games/submit-score:
+ * post:
+ * summary: Nộp điểm mới (Chỉ cập nhật nếu cao hơn điểm cũ)
+ * tags: [Games]
+ * security:
+ * - bearerAuth: []
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * required:
+ * - gameId
+ * - score
+ * properties:
+ * gameId:
+ * type: string
+ * score:
+ * type: number
+ * responses:
+ * 200:
+ * description: Kết quả nộp điểm
+ */
 router.post('/submit-score', protect, async (req, res) => {
   try {
     const { gameId, score } = req.body;
     const userId = req.user._id;
-    // Lấy tên hiển thị ưu tiên
     const username = req.user.name || req.user.username || "Gamer";
 
-    // 1. Tìm xem user này đã có điểm ở game này chưa
     const existingEntry = await Leaderboard.findOne({ userId, gameId });
 
     if (existingEntry) {
-      // 2. Nếu có rồi, kiểm tra xem điểm mới có cao hơn không
       if (score > existingEntry.score) {
         existingEntry.score = score;
-        existingEntry.username = username; // Cập nhật lại tên nhỡ user đổi tên
-        existingEntry.createdAt = Date.now(); // Cập nhật thời gian
+        existingEntry.username = username;
+        existingEntry.createdAt = Date.now();
         await existingEntry.save();
         return res.json({ success: true, message: "New high score updated!" });
       } else {
         return res.json({ success: true, message: "Score is lower than record, kept old score." });
       }
     } else {
-      // 3. Nếu chưa có thì tạo mới
       const newScore = new Leaderboard({
         userId,
         username,
@@ -92,7 +182,6 @@ router.post('/submit-score', protect, async (req, res) => {
       await newScore.save();
       return res.json({ success: true, message: "First score submitted!" });
     }
-
   } catch (err) {
     console.error("Submit Score Error:", err);
     res.status(500).json({ error: err.message });
@@ -100,13 +189,28 @@ router.post('/submit-score', protect, async (req, res) => {
 });
 
 // --- 5. LẤY BẢNG XẾP HẠNG (Public) ---
+/**
+ * @openapi
+ * /api/games/leaderboard/{gameId}:
+ * get:
+ * summary: Lấy Top 20 bảng xếp hạng của một trò chơi
+ * tags: [Games]
+ * parameters:
+ * - in: path
+ * name: gameId
+ * required: true
+ * schema:
+ * type: string
+ * responses:
+ * 200:
+ * description: Danh sách Top 20 điểm cao nhất
+ */
 router.get('/leaderboard/:gameId', async (req, res) => {
   try {
-    // Lấy Top 20 người điểm cao nhất
     const topScores = await Leaderboard.find({ gameId: req.params.gameId })
-      .sort({ score: -1 }) // Giảm dần
+      .sort({ score: -1 })
       .limit(20)
-      .select('username score createdAt'); // Chỉ lấy các trường cần thiết
+      .select('username score createdAt');
 
     res.json(topScores);
   } catch (err) {

@@ -3,19 +3,36 @@
 import express from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import AIMessage from '../models/AIMessage.js';
-import AICharacter from '../models/aiCharacterModel.js'; // 👈 QUAN TRỌNG: Import Model nhân vật
-import { protect, moderator } from '../middleware/authMiddleware.js'; // 👈 QUAN TRỌNG: Import moderator
+import AICharacter from '../models/aiCharacterModel.js'; 
+import { protect, moderator } from '../middleware/authMiddleware.js'; 
 
 const router = express.Router();
+
+/**
+ * @openapi
+ * tags:
+ * name: AI
+ * description: Hệ thống Chatbot AI (Gemini) và quản lý nhân vật AI
+ */
 
 // ==========================================
 // 🟢 PHẦN 1: QUẢN LÝ NHÂN VẬT (CHARACTERS)
 // ==========================================
 
-// 1. Lấy danh sách nhân vật (Cho App User hiển thị)
+/**
+ * @openapi
+ * /api/ai/characters:
+ * get:
+ * summary: Lấy danh sách nhân vật AI (Cho người dùng)
+ * tags: [AI]
+ * security:
+ * - bearerAuth: []
+ * responses:
+ * 200:
+ * description: Trả về danh sách nhân vật đang hoạt động
+ */
 router.get('/characters', protect, async (req, res) => {
   try {
-    // Chỉ lấy nhân vật đang bật, ẩn systemPrompt để bảo mật
     const characters = await AICharacter.find({ isEnabled: true }).select('-systemPrompt');
     res.json(characters);
   } catch (error) {
@@ -23,7 +40,18 @@ router.get('/characters', protect, async (req, res) => {
   }
 });
 
-// 2. [ADMIN] Lấy tất cả nhân vật (Kèm System Prompt để sửa)
+/**
+ * @openapi
+ * /api/ai/admin/characters:
+ * get:
+ * summary: Admin lấy toàn bộ danh sách nhân vật
+ * tags: [AI]
+ * security:
+ * - bearerAuth: []
+ * responses:
+ * 200:
+ * description: Danh sách đầy đủ kèm System Prompt
+ */
 router.get('/admin/characters', protect, moderator, async (req, res) => {
   try {
     const characters = await AICharacter.find({}).select('+systemPrompt').sort({ createdAt: -1 });
@@ -33,7 +61,30 @@ router.get('/admin/characters', protect, moderator, async (req, res) => {
   }
 });
 
-// 3. [ADMIN] Tạo nhân vật mới
+/**
+ * @openapi
+ * /api/ai/admin/characters:
+ * post:
+ * summary: Tạo nhân vật AI mới (Admin/Mod)
+ * tags: [AI]
+ * security:
+ * - bearerAuth: []
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * properties:
+ * name: {type: string}
+ * bio: {type: string}
+ * systemPrompt: {type: string}
+ * avatarUrl: {type: string}
+ * personality: {type: string}
+ * responses:
+ * 201:
+ * description: Tạo thành công
+ */
 router.post('/admin/characters', protect, moderator, async (req, res) => {
   try {
     const { name, avatarUrl, bio, systemPrompt, personality } = req.body;
@@ -50,7 +101,29 @@ router.post('/admin/characters', protect, moderator, async (req, res) => {
   }
 });
 
-// 4. [ADMIN] Sửa nhân vật
+/**
+ * @openapi
+ * /api/ai/admin/characters/{id}:
+ * put:
+ * summary: Cập nhật thông tin nhân vật AI
+ * tags: [AI]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: id
+ * required: true
+ * schema:
+ * type: string
+ * requestBody:
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * responses:
+ * 200:
+ * description: Cập nhật thành công
+ */
 router.put('/admin/characters/:id', protect, moderator, async (req, res) => {
   try {
     const character = await AICharacter.findById(req.params.id);
@@ -72,7 +145,24 @@ router.put('/admin/characters/:id', protect, moderator, async (req, res) => {
   }
 });
 
-// 5. [ADMIN] Xóa nhân vật
+/**
+ * @openapi
+ * /api/ai/admin/characters/{id}:
+ * delete:
+ * summary: Xóa nhân vật AI
+ * tags: [AI]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: id
+ * required: true
+ * schema:
+ * type: string
+ * responses:
+ * 200:
+ * description: Xóa thành công
+ */
 router.delete('/admin/characters/:id', protect, moderator, async (req, res) => {
   try {
     await AICharacter.deleteOne({ _id: req.params.id });
@@ -86,7 +176,28 @@ router.delete('/admin/characters/:id', protect, moderator, async (req, res) => {
 // 🔵 PHẦN 2: CHAT AI (LOGIC THÔNG MINH)
 // ==========================================
 
-// 1. API Gửi tin nhắn & Lưu vào DB
+/**
+ * @openapi
+ * /api/ai/chat:
+ * post:
+ * summary: Gửi tin nhắn và nhận phản hồi từ AI
+ * tags: [AI]
+ * security:
+ * - bearerAuth: []
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * properties:
+ * message: {type: string}
+ * character: {type: object}
+ * history: {type: array, items: {type: object}}
+ * responses:
+ * 200:
+ * description: Trả về phản hồi từ AI
+ */
 router.post('/chat', protect, async (req, res) => {
   try {
     const { message, character, history } = req.body;
@@ -96,8 +207,6 @@ router.post('/chat', protect, async (req, res) => {
       return res.status(500).json({ error: "Server chưa cấu hình GEMINI_API_KEY" });
     }
 
-    // 👇 BƯỚC QUAN TRỌNG: Tìm Character trong DB để lấy System Prompt MỚI NHẤT
-    // (Thay vì tin tưởng data client gửi lên)
     let dbCharacter = null;
     try {
         dbCharacter = await AICharacter.findById(character.id).select('+systemPrompt');
@@ -105,13 +214,10 @@ router.post('/chat', protect, async (req, res) => {
         console.log("Không tìm thấy character trong DB, dùng fallback client data");
     }
 
-    // Ưu tiên dùng data từ DB, nếu không có thì dùng data client (fallback)
     const systemPromptToUse = dbCharacter ? dbCharacter.systemPrompt : (character.systemPrompt || "Bạn là trợ lý ảo hữu ích.");
     const charName = dbCharacter ? dbCharacter.name : character.name;
     const charBio = dbCharacter ? dbCharacter.bio : character.bio;
 
-
-    // --- A. LƯU TIN NHẮN CỦA USER VÀO DB NGAY ---
     await AIMessage.create({
       userId,
       characterId: character.id,
@@ -119,27 +225,11 @@ router.post('/chat', protect, async (req, res) => {
       content: message
     });
 
-    // --- B. GỌI GEMINI ---
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     let chatHistory = [];
-    
-    // 👇 Prompt Xịn (Đã cập nhật biến động)
-    const systemInstruction = `
-        HÃY NHẬP VAI HOÀN TOÀN. KHÔNG BAO GIỜ THOÁT VAI.
-        
-        Thông tin nhân vật của bạn:
-        - Tên: ${charName}
-        - Mô tả: ${charBio}
-        - Kịch bản nhập vai (SYSTEM PROMPT): "${systemPromptToUse}"
-        
-        Quy tắc bắt buộc:
-        1. Trả lời đúng với tính cách, giọng điệu được mô tả ở trên.
-        2. Không bao giờ nói "Tôi là AI", "Tôi là Gemini" hay "Tôi là máy tính".
-        3. Nếu User hỏi bạn là ai, hãy trả lời theo tên nhân vật của bạn.
-        4. Giữ câu trả lời ngắn gọn, tự nhiên như chat mạng xã hội (trừ khi được yêu cầu viết dài).
-    `;
+    const systemInstruction = `HÃY NHẬP VAI HOÀN TOÀN. KHÔNG BAO GIỜ THOÁT VAI. Thông tin nhân vật: Tên: ${charName}, Mô tả: ${charBio}, Kịch bản: ${systemPromptToUse}`;
 
     chatHistory.push({ role: "user", parts: [{ text: systemInstruction }] });
     chatHistory.push({ role: "model", parts: [{ text: `Đã rõ. Tôi là ${charName}.` }] });
@@ -156,7 +246,6 @@ router.post('/chat', protect, async (req, res) => {
     const response = await result.response;
     const text = response.text();
 
-    // --- C. LƯU CÂU TRẢ LỜI CỦA AI VÀO DB ---
     await AIMessage.create({
       userId,
       characterId: character.id,
@@ -172,7 +261,24 @@ router.post('/chat', protect, async (req, res) => {
   }
 });
 
-// 2. API Lấy lịch sử chat cũ
+/**
+ * @openapi
+ * /api/ai/history/{characterId}:
+ * get:
+ * summary: Lấy lịch sử chat với nhân vật
+ * tags: [AI]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: characterId
+ * required: true
+ * schema:
+ * type: string
+ * responses:
+ * 200:
+ * description: OK
+ */
 router.get('/history/:characterId', protect, async (req, res) => {
     try {
         const messages = await AIMessage.find({
@@ -191,7 +297,24 @@ router.get('/history/:characterId', protect, async (req, res) => {
     }
 });
 
-// 3. Xóa lịch sử
+/**
+ * @openapi
+ * /api/ai/history/{characterId}:
+ * delete:
+ * summary: Xóa lịch sử chat
+ * tags: [AI]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: characterId
+ * required: true
+ * schema:
+ * type: string
+ * responses:
+ * 200:
+ * description: Xóa thành công
+ */
 router.delete('/history/:characterId', protect, async (req, res) => {
     try {
         const { characterId } = req.params;
@@ -204,7 +327,6 @@ router.delete('/history/:characterId', protect, async (req, res) => {
 
         res.status(200).json({ message: "Đã xóa lịch sử chat thành công" });
     } catch (error) {
-        console.error("❌ Lỗi xóa history:", error);
         res.status(500).json({ error: "Lỗi Server khi xóa dữ liệu" });
     }
 });

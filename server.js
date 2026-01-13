@@ -8,7 +8,9 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import fs from 'fs'; 
 import User from './models/userModel.js'; 
-
+// --- IMPORT SWAGGER ---
+import swaggerJSDoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
 // --- IMPORT MODEL ---
 import Message from './models/Message.js'; 
 import Conversation from './models/Conversation.js';
@@ -76,6 +78,47 @@ ensureDir(uploadDir);
 ensureDir(musicDir); 
 
 console.log("📂 Server đang phục vụ ảnh từ thư mục:", uploadDir);
+
+// --- CẤU HÌNH SWAGGER DEFINITION ---
+const swaggerOptions = {
+  swaggerDefinition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'XmasOcial API Documents',
+      version: '1.0.0',
+      description: 'Tài liệu hướng dẫn sử dụng API cho dự án XmasOcial',
+      contact: {
+        name: 'Developer'
+      },
+      servers: [
+              {
+                url: 'http://localhost:5000',
+                description: 'Local Server',
+              },
+              {
+                url: 'https://xmasocial-server.onrender.com', 
+                description: 'Production Server (OnRender)',
+              }
+            ]
+    },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+  },
+  // ĐƯỜNG DẪN QUÉT FILE: Quét tất cả file trong thư mục routes
+  apis: ['./backend/routes/*.js'], 
+};
+
+const swaggerDocs = swaggerJSDoc(swaggerOptions);
+
+// --- ROUTE HIỂN THỊ GIAO DIỆN SWAGGER ---
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // 4. Cấu hình Serve Static
 app.use('/uploads', express.static(uploadDir));
