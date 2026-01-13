@@ -9,8 +9,8 @@ import http from 'http';
 import fs from 'fs'; 
 import User from './models/userModel.js'; 
 import cors from 'cors';
-import Conversation from './models/conversationModel.js'; 
-import Message from './models/messageModel.js'; 
+import Conversation from './models/Conversation.js'; 
+import Message from './models/Message.js'; 
 // --- SỬA SWAGGER THÀNH DẠNG TĨNH ---
 import swaggerUi from 'swagger-ui-express';
 
